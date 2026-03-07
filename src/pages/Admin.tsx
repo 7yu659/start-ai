@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Settings, LayoutDashboard, FileText, DollarSign, Save, Plus, Edit2, Trash2, LogIn, X, MessageSquare, Mail } from 'lucide-react';
-import { AITool, AdSettings } from '../types';
+import { Settings, LayoutDashboard, FileText, DollarSign, Save, Plus, Edit2, Trash2, LogIn, X, MessageSquare, Mail, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import { AITool, AdSettings, Comment } from '../types';
 import AdminComments from '../components/AdminComments';
 import AdminNewsletter from '../components/AdminNewsletter';
+import { db } from '../lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 export default function Admin() {
   const { tools, adSettings, siteSettings, isAdmin, loginAdmin, logoutAdmin, addTool, updateTool, deleteTool, updateAdSettings, updateSiteSettings } = useAppContext();
@@ -19,8 +21,22 @@ export default function Admin() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [toolToDelete, setToolToDelete] = useState<string | null>(null);
   const [editingTool, setEditingTool] = useState<AITool | null>(null);
+  const [unreadComments, setUnreadComments] = useState(0);
+
+  const contentTextAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    const q = query(collection(db, 'comments'), where('isRead', '==', false));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUnreadComments(snapshot.size);
+    });
+    return () => unsubscribe();
+  }, [isAdmin]);
 
   const [formData, setFormData] = useState<Partial<AITool>>({
     name: '', slug: '', tagline: '', category: '', imageUrl: '', pricing: '', websiteUrl: '',
@@ -116,14 +132,52 @@ export default function Admin() {
     setIsContentUploading(true);
     try {
       const url = await uploadToCloudinary(file);
-      const imageMarkdown = `\n\n![Image](${url})\n\n`;
-      setFormData(prev => ({ ...prev, content: (prev.content || '') + imageMarkdown }));
+      const caption = window.prompt('Enter image caption (optional):', '');
+      const imageMarkdown = caption 
+        ? `\n\n<div class="blog-image-container">\n  ![${caption}](${url})\n  <p class="image-caption">${caption}</p>\n</div>\n\n`
+        : `\n\n<div class="blog-image-container">\n  ![Image](${url})\n</div>\n\n`;
+      
+      const textarea = contentTextAreaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = formData.content || '';
+        const before = text.substring(0, start);
+        const after = text.substring(end);
+        setFormData(prev => ({ ...prev, content: before + imageMarkdown + after }));
+      } else {
+        setFormData(prev => ({ ...prev, content: (prev.content || '') + imageMarkdown }));
+      }
     } catch (error) {
       console.error('Error uploading content image:', error);
       alert('Error uploading image. Please check Cloudinary settings.');
     } finally {
       setIsContentUploading(false);
     }
+  };
+
+  const insertLink = () => {
+    const url = window.prompt('Enter URL:', 'https://');
+    if (!url) return;
+    const text = window.prompt('Enter link text:', 'Click here');
+    if (!text) return;
+    
+    const linkMarkdown = `[${text}](${url})`;
+    const textarea = contentTextAreaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const content = formData.content || '';
+      const before = content.substring(0, start);
+      const after = content.substring(end);
+      setFormData(prev => ({ ...prev, content: before + linkMarkdown + after }));
+    } else {
+      setFormData(prev => ({ ...prev, content: (prev.content || '') + linkMarkdown }));
+    }
+  };
+
+  const getWordCount = (text: string = '') => {
+    return text.trim() ? text.trim().split(/\s+/).length : 0;
   };
 
   const handleToolSubmit = (e: React.FormEvent) => {
@@ -180,22 +234,29 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row">
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shrink-0">
+      <aside className="w-full md:w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shrink-0 md:sticky md:top-0 md:h-screen overflow-hidden flex flex-col">
         <div className="p-6 flex justify-between items-center">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <LayoutDashboard className="w-5 h-5 text-blue-600" /> Admin
           </h2>
-          <button onClick={logoutAdmin} className="md:hidden text-sm text-rose-500">Logout</button>
+          <button onClick={() => setIsLogoutModalOpen(true)} className="md:hidden text-sm text-rose-500">Logout</button>
         </div>
-        <nav className="px-4 space-y-2 pb-6 flex md:flex-col overflow-x-auto md:overflow-visible">
+        <nav className="px-4 space-y-2 pb-6 flex md:flex-col overflow-x-auto md:overflow-y-auto flex-1 scrollbar-hide">
           <button onClick={() => setActiveTab('tools')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'tools' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
             <FileText className="w-4 h-4" /> Manage Tools
           </button>
           <button onClick={() => setActiveTab('categories')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'categories' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
             <LayoutDashboard className="w-4 h-4" /> Categories
           </button>
-          <button onClick={() => setActiveTab('comments')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'comments' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
-            <MessageSquare className="w-4 h-4" /> Comments
+          <button onClick={() => setActiveTab('comments')} className={`shrink-0 w-auto md:w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'comments' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-4 h-4" /> Comments
+            </div>
+            {unreadComments > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {unreadComments}
+              </span>
+            )}
           </button>
           <button onClick={() => setActiveTab('newsletter')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'newsletter' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
             <Mail className="w-4 h-4" /> Newsletter
@@ -206,7 +267,7 @@ export default function Admin() {
           <button onClick={() => setActiveTab('settings')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
             <Settings className="w-4 h-4" /> Settings
           </button>
-          <button onClick={logoutAdmin} className="hidden md:flex shrink-0 w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/30 transition-colors mt-auto">
+          <button onClick={() => setIsLogoutModalOpen(true)} className="hidden md:flex shrink-0 w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/30 transition-colors mt-auto mb-4">
             <LogIn className="w-4 h-4 rotate-180" /> Logout
           </button>
         </nav>
@@ -565,13 +626,30 @@ export default function Admin() {
               
               <div>
                 <div className="flex justify-between items-end mb-1">
-                  <label className="block text-sm">Full Content (Markdown)</label>
+                  <div className="flex items-center gap-4">
+                    <label className="block text-sm">Full Content (Markdown)</label>
+                    <button type="button" onClick={insertLink} className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1">
+                      <LinkIcon className="w-3 h-3" /> Add Link
+                    </button>
+                  </div>
                   <label className="cursor-pointer text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                    <ImageIcon className="w-4 h-4" />
                     {isContentUploading ? 'Uploading...' : '+ Insert Image'}
                     <input type="file" accept="image/*" className="hidden" onChange={handleContentImageUpload} disabled={isContentUploading} />
                   </label>
                 </div>
-                <textarea required value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-40 font-mono text-sm" />
+                <div className="relative">
+                  <textarea 
+                    ref={contentTextAreaRef}
+                    required 
+                    value={formData.content} 
+                    onChange={e => setFormData({...formData, content: e.target.value})} 
+                    className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-64 font-mono text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                  />
+                  <div className="absolute bottom-2 right-3 text-[10px] text-slate-400 font-mono">
+                    Words: {getWordCount(formData.content)}
+                  </div>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -613,6 +691,22 @@ export default function Admin() {
             <div className="flex justify-center gap-4">
               <button onClick={() => setIsDeleteModalOpen(false)} className="px-6 py-2 rounded-xl font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
               <button onClick={handleDelete} className="px-6 py-2 rounded-xl font-medium text-white bg-rose-600 hover:bg-rose-700">Yes, Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+        <div className="fixed inset-0 z-[110] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-4">
+              <LogIn className="w-8 h-8 rotate-180" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Logout?</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to log out of the admin panel?</p>
+            <div className="flex justify-center gap-4">
+              <button onClick={() => setIsLogoutModalOpen(false)} className="px-6 py-2 rounded-xl font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+              <button onClick={() => { logoutAdmin(); setIsLogoutModalOpen(false); }} className="px-6 py-2 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700">Yes, Logout</button>
             </div>
           </div>
         </div>

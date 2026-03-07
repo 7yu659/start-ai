@@ -6,18 +6,43 @@ import { useAppContext } from '../context/AppContext';
 import SEO from '../components/SEO';
 import AdSlot from '../components/AdSlot';
 import { AITool } from '../types';
+import { db } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Home() {
   const { tools, adSettings, siteSettings } = useAppContext();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail('');
-      setTimeout(() => setSubscribed(false), 5000);
+    if (email && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        await addDoc(collection(db, 'subscribers'), {
+          email,
+          createdAt: serverTimestamp()
+        });
+        
+        // Simulate email automation
+        console.log('--- Newsletter Automation Email Sent ---');
+        console.log(`To: ${email}`);
+        console.log(`Message: ${siteSettings.newsletterAutomationText}`);
+        if (siteSettings.newsletterAutomationPdfUrl) {
+          console.log(`Attachment: ${siteSettings.newsletterAutomationPdfUrl}`);
+        }
+        console.log('----------------------------------------');
+
+        setSubscribed(true);
+        setEmail('');
+        setTimeout(() => setSubscribed(false), 5000);
+      } catch (error) {
+        console.error('Error subscribing:', error);
+        alert('Something went wrong. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -214,8 +239,8 @@ export default function Home() {
                 className="flex-grow px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
-              <button type="submit" className="btn-primary whitespace-nowrap">
-                {siteSettings.newsletterButtonText}
+              <button type="submit" className="btn-primary whitespace-nowrap" disabled={isSubmitting}>
+                {isSubmitting ? 'Subscribing...' : siteSettings.newsletterButtonText}
               </button>
             </form>
           )}

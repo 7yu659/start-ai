@@ -46,6 +46,7 @@ export interface Comment {
   text: string;
   createdAt: string;
   reply?: string;
+  isRead?: boolean;
 }
 
 export interface CategoryGroup {

@@ -56,4 +56,26 @@
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-400;
   }
+
+  /* Blog Content Styles */
+  .blog-image-container {
+    @apply my-8 flex flex-col items-center gap-3;
+  }
+
+  .blog-image-container img {
+    @apply w-full max-w-full rounded-3xl shadow-xl transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl;
+  }
+
+  .image-caption {
+    @apply italic text-sm text-slate-500 dark:text-slate-400 text-center;
+  }
+
+  /* Scrollbar Hide Utility */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Sun, Search, Menu, Sparkles, ChevronDown, X } from 'lucide-react';
+import { Moon, Sun, Search, Menu, Sparkles, ChevronDown, X, LayoutDashboard } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export default function Navbar() {
-  const { isDarkMode, toggleDarkMode, tools, siteSettings } = useAppContext();
+  const { isDarkMode, toggleDarkMode, tools, siteSettings, isAdmin } = useAppContext();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -79,6 +79,12 @@ export default function Navbar() {
               <Link to="/terms" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Terms of Service</Link>
               <Link to="/about" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">About</Link>
               
+              {isAdmin && (
+                <Link to="/admin" className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/50">
+                  <LayoutDashboard className="w-4 h-4" /> Dashboard
+                </Link>
+              )}
+              
               <div className="flex items-center gap-2 pl-4 border-l border-slate-200 dark:border-slate-700">
                 <button 
                   onClick={() => setIsSearchOpen(true)}
@@ -129,6 +135,9 @@ export default function Navbar() {
             <Link to="/privacy" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-medium text-slate-900 dark:text-white">Privacy Policy</Link>
             <Link to="/terms" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-medium text-slate-900 dark:text-white">Terms of Service</Link>
             <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-medium text-slate-900 dark:text-white">About</Link>
+            {isAdmin && (
+              <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block text-base font-bold text-blue-600 dark:text-blue-400">Dashboard</Link>
+            )}
           </div>
         )}
       </nav>

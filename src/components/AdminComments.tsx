@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { Comment } from '../types';
-import { MessageSquare, Star, Trash2, Reply, Check } from 'lucide-react';
+import { MessageSquare, Star, Trash2, Reply, Check, Calendar, ExternalLink, X } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
 export default function AdminComments() {
+  const { tools } = useAppContext();
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [newDate, setNewDate] = useState('');
 
   useEffect(() => {
     const q = query(collection(db, 'comments'), orderBy('createdAt', 'desc'));
@@ -18,23 +22,46 @@ export default function AdminComments() {
         createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString()
       })) as Comment[];
       setComments(fetched);
+      
+      // Mark as read when admin views them
+      fetched.forEach(comment => {
+        if (!comment.isRead) {
+          updateDoc(doc(db, 'comments', comment.id), { isRead: true });
+        }
+      });
     });
     return () => unsubscribe();
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this comment?')) {
+    if (window.confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
       await deleteDoc(doc(db, 'comments', id));
     }
   };
 
   const handleReply = async (id: string) => {
     if (!replyText.trim()) return;
-    await updateDoc(doc(db, 'comments', id), {
-      reply: replyText
-    });
-    setReplyingTo(null);
-    setReplyText('');
+    if (window.confirm('Save this reply?')) {
+      await updateDoc(doc(db, 'comments', id), {
+        reply: replyText
+      });
+      setReplyingTo(null);
+      setReplyText('');
+    }
+  };
+
+  const handleUpdateDate = async (id: string) => {
+    if (!newDate) return;
+    if (window.confirm('Are you sure you want to change the comment date?')) {
+      await updateDoc(doc(db, 'comments', id), {
+        createdAt: Timestamp.fromDate(new Date(newDate))
+      });
+      setEditingDate(null);
+    }
+  };
+
+  const getToolName = (toolId: string) => {
+    return tools.find(t => t.id === toolId)?.name || 'Unknown Tool';
   };
 
   return (
@@ -55,13 +82,37 @@ export default function AdminComments() {
         ) : (
           comments.map((comment) => (
             <div key={comment.id} className="bg-white dark:bg-slate-800/50 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h5 className="font-bold text-slate-900 dark:text-white">{comment.userName}</h5>
+              <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h5 className="font-bold text-slate-900 dark:text-white">{comment.userName}</h5>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                      <ExternalLink className="w-3 h-3" /> {getToolName(comment.toolId)}
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{comment.userEmail}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                    {new Date(comment.createdAt).toLocaleString()}
-                  </p>
+                  
+                  <div className="flex items-center gap-2 mt-2">
+                    {editingDate === comment.id ? (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="datetime-local" 
+                          value={newDate}
+                          onChange={(e) => setNewDate(e.target.value)}
+                          className="text-xs px-2 py-1 rounded border dark:bg-slate-900 dark:border-slate-700"
+                        />
+                        <button onClick={() => handleUpdateDate(comment.id)} className="text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
+                        <button onClick={() => setEditingDate(null)} className="text-slate-400 hover:text-slate-500"><X className="w-4 h-4" /></button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => { setEditingDate(comment.id); setNewDate(comment.createdAt.substring(0, 16)); }}
+                        className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 hover:text-blue-500 transition-colors"
+                      >
+                        <Calendar className="w-3 h-3" /> {new Date(comment.createdAt).toLocaleString()}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex gap-1">
@@ -74,17 +125,17 @@ export default function AdminComments() {
                   </button>
                 </div>
               </div>
-              <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap mb-4">{comment.text}</p>
+              <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap mb-4 bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">{comment.text}</p>
               
               {comment.reply ? (
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border-l-4 border-blue-500">
+                <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border-l-4 border-blue-500">
                   <div className="flex justify-between items-start mb-2">
                     <p className="text-xs font-bold text-blue-600 dark:text-blue-400">Your Reply</p>
                     <button onClick={() => { setReplyingTo(comment.id); setReplyText(comment.reply || ''); }} className="text-blue-500 hover:text-blue-700 text-xs flex items-center gap-1">
                       <Reply className="w-3 h-3" /> Edit Reply
                     </button>
                   </div>
-                  <p className="text-sm text-slate-700 dark:text-slate-300">{comment.reply}</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 italic">"{comment.reply}"</p>
                 </div>
               ) : (
                 replyingTo === comment.id ? (

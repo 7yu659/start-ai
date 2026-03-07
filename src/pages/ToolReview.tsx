@@ -1,11 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft, Star, CheckCircle2, XCircle, ExternalLink, PlayCircle, Calendar, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Star, CheckCircle2, XCircle, ExternalLink, PlayCircle, Calendar, ChevronRight, ChevronLeft } from 'lucide-react';
 import Markdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import { useAppContext } from '../context/AppContext';
 import SEO from '../components/SEO';
 import AdSlot from '../components/AdSlot';
 import CommentSection from '../components/CommentSection';
+import { useRef } from 'react';
 
 const RatingBar = ({ label, score }: { label: string, score: number }) => (
   <div className="mb-4">
@@ -124,7 +126,7 @@ export default function ToolReview() {
               </p>
               
               <div className="prose prose-lg prose-slate dark:prose-invert max-w-none">
-                <Markdown>{tool.content}</Markdown>
+                <Markdown rehypePlugins={[rehypeRaw]}>{tool.content}</Markdown>
               </div>
 
               {(tool.ctaPosition === 'bottom' || tool.ctaPosition === 'both') && tool.ctaLink && (
@@ -226,7 +228,7 @@ export default function ToolReview() {
                 <div className="space-y-4">
                   {relatedTools.slice(0, 6).map((rt) => (
                     <Link key={rt.id} to={`/tool/${rt.slug}`} className="block group">
-                      <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                      <h4 className="font-semibold text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors line-clamp-1">
                         {rt.name}
                       </h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">
@@ -243,12 +245,49 @@ export default function ToolReview() {
         {/* Bottom Related Blogs */}
         {relatedTools.length > 0 && (
           <div className="mt-20 border-t border-slate-200 dark:border-slate-800 pt-16">
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-8 text-center">More from {tool.category}</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">More from {tool.category}</h3>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    const el = document.getElementById('related-scroll');
+                    if (el) el.scrollBy({ left: -300, behavior: 'smooth' });
+                  }}
+                  className="p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => {
+                    const el = document.getElementById('related-scroll');
+                    if (el) el.scrollBy({ left: 300, behavior: 'smooth' });
+                  }}
+                  className="p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div 
+              id="related-scroll"
+              className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x"
+            >
               {relatedTools.map((rt) => (
-                <Link key={rt.id} to={`/tool/${rt.slug}`} className="glass-card p-4 hover:-translate-y-1 transition-transform">
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-1 line-clamp-1">{rt.name}</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{rt.tagline}</p>
+                <Link 
+                  key={rt.id} 
+                  to={`/tool/${rt.slug}`} 
+                  className="flex-shrink-0 w-[280px] glass-card p-4 flex items-center gap-4 hover:-translate-y-1 transition-transform snap-start"
+                >
+                  <img 
+                    src={rt.imageUrl} 
+                    alt="" 
+                    className="w-16 h-16 rounded-xl object-cover shrink-0" 
+                    referrerPolicy="no-referrer" 
+                  />
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-1 line-clamp-1">{rt.name}</h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{rt.tagline}</p>
+                  </div>
                 </Link>
               ))}
             </div>
