@@ -4,6 +4,7 @@ import { Settings, LayoutDashboard, FileText, DollarSign, Save, Plus, Edit2, Tra
 import { AITool, AdSettings, Comment } from '../types';
 import AdminComments from '../components/AdminComments';
 import AdminNewsletter from '../components/AdminNewsletter';
+import AdminAnalytics from '../components/AdminAnalytics';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -102,10 +103,15 @@ export default function Admin() {
       body: formData,
     });
     const data = await response.json();
+    
     if (data.secure_url) {
+      // Ensure the URL is in the requested format
       return data.secure_url;
+    } else if (data.url) {
+      return data.url.replace('http://', 'https://');
     } else {
-      throw new Error('Upload failed');
+      console.error('Cloudinary response error:', data);
+      throw new Error(data.error?.message || 'Upload failed');
     }
   };
 
@@ -261,6 +267,9 @@ export default function Admin() {
           <button onClick={() => setActiveTab('newsletter')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'newsletter' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
             <Mail className="w-4 h-4" /> Newsletter
           </button>
+          <button onClick={() => setActiveTab('analytics')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
+            <LayoutDashboard className="w-4 h-4" /> Analytics
+          </button>
           <button onClick={() => setActiveTab('ads')} className={`shrink-0 w-auto md:w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeTab === 'ads' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50'}`}>
             <DollarSign className="w-4 h-4" /> AdSense
           </button>
@@ -324,75 +333,60 @@ export default function Admin() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Manage Categories & Menus</h1>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">Configure header and footer category menus.</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">Configure header and footer category menus for better SEO.</p>
                 </div>
               </div>
               <form onSubmit={handleSiteSave} className="space-y-8">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">All Available Categories (Comma separated)</label>
-                  <input
-                    type="text"
-                    value={localSiteSettings.categories?.join(', ') || ''}
-                    onChange={(e) => setLocalSiteSettings({...localSiteSettings, categories: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="e.g. Chatbots, Image Generation, Productivity"
-                  />
-                  <p className="text-xs text-slate-500 mt-2">These categories will appear in the dropdown when adding or editing a tool.</p>
-                </div>
-
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Menu Groups (Header & Footer)</h3>
-                  <div className="space-y-6">
-                    {(localSiteSettings.categoryGroups || []).map((group, idx) => (
-                      <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                        <div className="flex justify-between items-center mb-4">
-                          <input
-                            type="text"
-                            value={group.name}
-                            onChange={(e) => {
-                              const newGroups = [...(localSiteSettings.categoryGroups || [])];
-                              newGroups[idx].name = e.target.value;
-                              setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
-                            }}
-                            className="font-bold text-slate-900 dark:text-white bg-transparent border-b border-slate-300 dark:border-slate-600 focus:border-blue-500 outline-none px-1 py-1"
-                            placeholder="Group Name (e.g. Solutions)"
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              const newGroups = (localSiteSettings.categoryGroups || []).filter((_, i) => i !== idx);
-                              setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
-                            }}
-                            className="text-rose-500 hover:text-rose-700 text-sm"
-                          >
-                            Remove Group
-                          </button>
-                        </div>
-                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Categories in this group (Comma separated)</label>
+                <div className="space-y-6">
+                  {(localSiteSettings.categoryGroups || []).map((group, idx) => (
+                    <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                      <div className="flex justify-between items-center mb-4">
                         <input
                           type="text"
-                          value={group.categories.join(', ')}
+                          value={group.name}
                           onChange={(e) => {
                             const newGroups = [...(localSiteSettings.categoryGroups || [])];
-                            newGroups[idx].categories = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                            newGroups[idx].name = e.target.value;
                             setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
                           }}
-                          className="w-full px-3 py-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                          placeholder="e.g. Chatbots, Writing"
+                          className="font-bold text-slate-900 dark:text-white bg-transparent border-b border-slate-300 dark:border-slate-600 focus:border-blue-500 outline-none px-1 py-1"
+                          placeholder="Group Name (e.g. Solutions)"
                         />
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const newGroups = (localSiteSettings.categoryGroups || []).filter((_, i) => i !== idx);
+                            setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
+                          }}
+                          className="text-rose-500 hover:text-rose-700 text-sm"
+                        >
+                          Remove Group
+                        </button>
                       </div>
-                    ))}
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        const newGroups = [...(localSiteSettings.categoryGroups || []), { name: 'New Group', categories: [] }];
-                        setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
-                      }}
-                      className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                    >
-                      <Plus className="w-4 h-4" /> Add Menu Group
-                    </button>
-                  </div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Categories in this group (Comma separated)</label>
+                      <input
+                        type="text"
+                        value={group.categories.join(', ')}
+                        onChange={(e) => {
+                          const newGroups = [...(localSiteSettings.categoryGroups || [])];
+                          newGroups[idx].categories = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                          setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
+                        }}
+                        className="w-full px-3 py-2 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                        placeholder="e.g. Chatbots, Writing"
+                      />
+                    </div>
+                  ))}
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const newGroups = [...(localSiteSettings.categoryGroups || []), { name: 'New Group', categories: [] }];
+                      setLocalSiteSettings({ ...localSiteSettings, categoryGroups: newGroups });
+                    }}
+                    className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" /> Add Menu Group
+                  </button>
                 </div>
 
                 <div className="pt-6 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -406,6 +400,8 @@ export default function Admin() {
           {activeTab === 'comments' && <AdminComments />}
 
           {activeTab === 'newsletter' && <AdminNewsletter />}
+
+          {activeTab === 'analytics' && <AdminAnalytics />}
 
           {activeTab === 'ads' && (
             <div className="glass-card p-6 md:p-8">
@@ -577,7 +573,7 @@ export default function Admin() {
                   <label className="block text-sm mb-1">Category</label>
                   <select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700">
                     <option value="">Select a category</option>
-                    {localSiteSettings.categories?.map(cat => (
+                    {Array.from(new Set((localSiteSettings.categoryGroups || []).flatMap(g => g.categories))).sort().map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -653,9 +649,27 @@ export default function Admin() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div><label className="block text-sm mb-1">Pros (Comma separated)</label><textarea required value={formData.pros?.join(', ')} onChange={e => setFormData({...formData, pros: e.target.value.split(',').map(s=>s.trim())})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-20" /></div>
-                <div><label className="block text-sm mb-1">Cons (Comma separated)</label><textarea required value={formData.cons?.join(', ')} onChange={e => setFormData({...formData, cons: e.target.value.split(',').map(s=>s.trim())})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-20" /></div>
-                <div><label className="block text-sm mb-1">Features (Comma separated)</label><textarea required value={formData.features?.join(', ')} onChange={e => setFormData({...formData, features: e.target.value.split(',').map(s=>s.trim())})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-20" /></div>
+                <div>
+                  <label className="block text-sm mb-1">Pros (Comma separated)</label>
+                  <div className="relative">
+                    <textarea required value={formData.pros?.join(', ')} onChange={e => setFormData({...formData, pros: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-20" />
+                    <div className="absolute bottom-1 right-2 text-[10px] text-slate-400 font-mono">Count: {formData.pros?.length || 0}</div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Cons (Comma separated)</label>
+                  <div className="relative">
+                    <textarea required value={formData.cons?.join(', ')} onChange={e => setFormData({...formData, cons: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-20" />
+                    <div className="absolute bottom-1 right-2 text-[10px] text-slate-400 font-mono">Count: {formData.cons?.length || 0}</div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Features (Comma separated)</label>
+                  <div className="relative">
+                    <textarea required value={formData.features?.join(', ')} onChange={e => setFormData({...formData, features: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full px-3 py-2 rounded border dark:bg-slate-800 dark:border-slate-700 h-20" />
+                    <div className="absolute bottom-1 right-2 text-[10px] text-slate-400 font-mono">Count: {formData.features?.length || 0}</div>
+                  </div>
+                </div>
               </div>
 
               <div className="border-t border-slate-200 dark:border-slate-700 pt-6">

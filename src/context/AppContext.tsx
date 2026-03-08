@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AITool, AdSettings, SiteSettings } from '../types';
 import { initialTools, initialAdSettings, initialSiteSettings } from '../data/mockData';
 import { db } from '../lib/firebase';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, increment, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AppContextType {
   tools: AITool[];
@@ -19,6 +19,8 @@ interface AppContextType {
   deleteTool: (id: string) => Promise<void>;
   updateAdSettings: (settings: AdSettings) => Promise<void>;
   updateSiteSettings: (settings: SiteSettings) => Promise<void>;
+  trackToolView: (toolId: string) => Promise<void>;
+  trackCTAClick: (toolId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -201,11 +203,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const trackToolView = async (toolId: string) => {
+    if (isAdmin) return; // Don't track admin views
+    try {
+      const statsRef = doc(db, 'stats', toolId);
+      const statsDoc = await getDoc(statsRef);
+      if (!statsDoc.exists()) {
+        await setDoc(statsRef, { views: 1, clicks: 0, lastUpdated: serverTimestamp() });
+      } else {
+        await updateDoc(statsRef, { views: increment(1), lastUpdated: serverTimestamp() });
+      }
+    } catch (error) {
+      console.error("Error tracking view:", error);
+    }
+  };
+
+  const trackCTAClick = async (toolId: string) => {
+    try {
+      const statsRef = doc(db, 'stats', toolId);
+      const statsDoc = await getDoc(statsRef);
+      if (!statsDoc.exists()) {
+        await setDoc(statsRef, { views: 0, clicks: 1, lastUpdated: serverTimestamp() });
+      } else {
+        await updateDoc(statsRef, { clicks: increment(1), lastUpdated: serverTimestamp() });
+      }
+    } catch (error) {
+      console.error("Error tracking click:", error);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       tools, adSettings, siteSettings, isDarkMode, isAdmin, isLoading,
       toggleDarkMode, loginAdmin, logoutAdmin,
-      addTool, updateTool, deleteTool, updateAdSettings, updateSiteSettings
+      addTool, updateTool, deleteTool, updateAdSettings, updateSiteSettings,
+      trackToolView, trackCTAClick
     }}>
       {children}
     </AppContext.Provider>

@@ -82,3 +82,15 @@ export interface SiteSettings {
   preFooterTitle3: string;
   preFooterDesc3: string;
 }
+
+export interface AnalyticsEvent {
+  id: string;
+  type: 'view' | 'click';
+  toolId: string;
+  timestamp: any; // Firestore timestamp
+}
+
+export interface ToolStats {
+  views: number;
+  clicks: number;
+}

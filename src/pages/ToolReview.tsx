@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import SEO from '../components/SEO';
 import AdSlot from '../components/AdSlot';
 import CommentSection from '../components/CommentSection';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 
 const RatingBar = ({ label, score }: { label: string, score: number }) => (
   <div className="mb-4">
@@ -28,9 +28,15 @@ const RatingBar = ({ label, score }: { label: string, score: number }) => (
 
 export default function ToolReview() {
   const { slug } = useParams<{ slug: string }>();
-  const { tools, adSettings } = useAppContext();
+  const { tools, adSettings, trackToolView, trackCTAClick } = useAppContext();
   
   const tool = tools.find(t => t.slug === slug);
+
+  useEffect(() => {
+    if (tool) {
+      trackToolView(tool.id);
+    }
+  }, [tool?.id]);
 
   if (!tool) {
     return (
@@ -96,10 +102,10 @@ export default function ToolReview() {
             <p className="text-3xl font-bold text-slate-900 dark:text-white">{tool.pricing}</p>
           </div>
           <div className="flex gap-4 w-full sm:w-auto">
-            <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary flex-1 sm:flex-none">
+            <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackCTAClick(tool.id)} className="btn-secondary flex-1 sm:flex-none">
               Visit Website <ExternalLink className="w-4 h-4" />
             </a>
-            <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer" className="btn-primary flex-1 sm:flex-none">
+            <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackCTAClick(tool.id)} className="btn-primary flex-1 sm:flex-none">
               Try {tool.name}
             </a>
           </div>
@@ -115,7 +121,7 @@ export default function ToolReview() {
               
               {(tool.ctaPosition === 'top' || tool.ctaPosition === 'both') && tool.ctaLink && (
                 <div className="mb-8">
-                  <a href={tool.ctaLink} target="_blank" rel="noopener noreferrer" className="btn-primary inline-flex">
+                  <a href={tool.ctaLink} target="_blank" rel="noopener noreferrer" onClick={() => trackCTAClick(tool.id)} className="btn-primary inline-flex">
                     {tool.ctaText || 'Try Now'}
                   </a>
                 </div>
@@ -131,7 +137,7 @@ export default function ToolReview() {
 
               {(tool.ctaPosition === 'bottom' || tool.ctaPosition === 'both') && tool.ctaLink && (
                 <div className="mt-8">
-                  <a href={tool.ctaLink} target="_blank" rel="noopener noreferrer" className="btn-primary inline-flex">
+                  <a href={tool.ctaLink} target="_blank" rel="noopener noreferrer" onClick={() => trackCTAClick(tool.id)} className="btn-primary inline-flex">
                     {tool.ctaText || 'Try Now'}
                   </a>
                 </div>
@@ -178,7 +184,7 @@ export default function ToolReview() {
               <p className="text-slate-700 dark:text-slate-300 mb-6">
                 {tool.name} is a powerhouse in the {tool.category.toLowerCase()} space. With its impressive feature set and strong performance, it earns our high recommendation.
               </p>
-              <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer" className="btn-primary inline-flex">
+              <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackCTAClick(tool.id)} className="btn-primary inline-flex">
                 Start Using {tool.name} Today
               </a>
             </section>

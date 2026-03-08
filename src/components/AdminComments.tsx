@@ -13,6 +13,10 @@ export default function AdminComments() {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [newDate, setNewDate] = useState('');
 
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [commentToAction, setCommentToAction] = useState<string | null>(null);
+
   useEffect(() => {
     const q = query(collection(db, 'comments'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -33,31 +37,31 @@ export default function AdminComments() {
     return () => unsubscribe();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
-      await deleteDoc(doc(db, 'comments', id));
+  const handleDelete = async () => {
+    if (commentToAction) {
+      await deleteDoc(doc(db, 'comments', commentToAction));
+      setIsDeleteModalOpen(false);
+      setCommentToAction(null);
     }
   };
 
-  const handleReply = async (id: string) => {
-    if (!replyText.trim()) return;
-    if (window.confirm('Save this reply?')) {
-      await updateDoc(doc(db, 'comments', id), {
-        reply: replyText
-      });
-      setReplyingTo(null);
-      setReplyText('');
-    }
+  const handleReply = async () => {
+    if (!replyText.trim() || !commentToAction) return;
+    await updateDoc(doc(db, 'comments', commentToAction), {
+      reply: replyText
+    });
+    setIsReplyModalOpen(false);
+    setCommentToAction(null);
+    setReplyingTo(null);
+    setReplyText('');
   };
 
   const handleUpdateDate = async (id: string) => {
     if (!newDate) return;
-    if (window.confirm('Are you sure you want to change the comment date?')) {
-      await updateDoc(doc(db, 'comments', id), {
-        createdAt: Timestamp.fromDate(new Date(newDate))
-      });
-      setEditingDate(null);
-    }
+    await updateDoc(doc(db, 'comments', id), {
+      createdAt: Timestamp.fromDate(new Date(newDate))
+    });
+    setEditingDate(null);
   };
 
   const getToolName = (toolId: string) => {
@@ -120,7 +124,7 @@ export default function AdminComments() {
                       <Star key={star} className={`w-4 h-4 ${star <= comment.rating ? 'text-amber-500 fill-amber-500' : 'text-slate-300 dark:text-slate-600'}`} />
                     ))}
                   </div>
-                  <button onClick={() => handleDelete(comment.id)} className="text-rose-500 hover:text-rose-700 text-sm flex items-center gap-1">
+                  <button onClick={() => { setCommentToAction(comment.id); setIsDeleteModalOpen(true); }} className="text-rose-500 hover:text-rose-700 text-sm flex items-center gap-1">
                     <Trash2 className="w-4 h-4" /> Delete
                   </button>
                 </div>
@@ -149,7 +153,7 @@ export default function AdminComments() {
                     />
                     <div className="flex justify-end gap-2">
                       <button onClick={() => { setReplyingTo(null); setReplyText(''); }} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg">Cancel</button>
-                      <button onClick={() => handleReply(comment.id)} className="px-3 py-1.5 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg flex items-center gap-1">
+                      <button onClick={() => { setCommentToAction(comment.id); setIsReplyModalOpen(true); }} className="px-3 py-1.5 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg flex items-center gap-1">
                         <Check className="w-4 h-4" /> Save Reply
                       </button>
                     </div>
@@ -164,6 +168,40 @@ export default function AdminComments() {
           ))
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[110] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400 mx-auto mb-4">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Delete Comment?</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to delete this comment? This action cannot be undone.</p>
+            <div className="flex justify-center gap-4">
+              <button onClick={() => setIsDeleteModalOpen(false)} className="px-6 py-2 rounded-xl font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+              <button onClick={handleDelete} className="px-6 py-2 rounded-xl font-medium text-white bg-rose-600 hover:bg-rose-700">Yes, Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reply Confirmation Modal */}
+      {isReplyModalOpen && (
+        <div className="fixed inset-0 z-[110] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 mx-auto mb-4">
+              <Reply className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Save Reply?</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">Are you sure you want to save this reply?</p>
+            <div className="flex justify-center gap-4">
+              <button onClick={() => setIsReplyModalOpen(false)} className="px-6 py-2 rounded-xl font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+              <button onClick={handleReply} className="px-6 py-2 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700">Yes, Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
